@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/../lib"
+
+# --- Parse CLI args ---
+output=""
+files=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output) output="$2"; shift 2 ;;
+    *) files+=("$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"); shift ;;
+  esac
+done
+
+if [[ -z "$output" ]] || [[ ${#files[@]} -eq 0 ]]; then
+  echo "Usage: cog-nix --output <path> <files...>" >&2
+  exit 1
+fi
+
+# --- Find project root ---
+find_root() {
+  local dir="$1"
+  while [[ "$dir" != "/" ]]; do
+    [[ -f "$dir/flake.nix" ]] && echo "$dir" && return
+    [[ -f "$dir/default.nix" ]] && echo "$dir" && return
+    [[ -d "$dir/.git" ]] && echo "$dir" && return
+    dir="$(dirname "$dir")"
+  done
+  echo "$1"
+}
+
+project_root="$(find_root "$(dirname "${files[0]}")")"
+
+# --- Discover package name ---
+package_name="$(basename "$project_root")"
+if [[ -f "$project_root/flake.nix" ]]; then
+  desc="$(grep -m1 'description' "$project_root/flake.nix" 2>/dev/null | sed 's/.*"\(.*\)".*/\1/' 2>/dev/null || true)"
+  [[ -n "$desc" ]] && package_name="$desc"
+fi
+
+# --- Get version from cog-extension.json ---
+version="0.1.0"
+ext_json="$SCRIPT_DIR/../cog-extension.json"
+if [[ -f "$ext_json" ]]; then
+  version="$(grep '"version"' "$ext_json" | head -1 | sed 's/.*: *"\(.*\)".*/\1/')"
+fi
+
+# --- Build Nix file list expression ---
+nix_files="["
+for f in "${files[@]}"; do
+  # Escape path for Nix string
+  escaped="${f//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  nix_files="$nix_files \"$escaped\""
+done
+nix_files="$nix_files ]"
+
+# --- Run Nix evaluation ---
+hex=$(nix eval --impure --raw --expr "
+  import $LIB_DIR {
+    files = $nix_files;
+    projectRoot = \"$project_root\";
+    packageName = \"$package_name\";
+    toolVersion = \"$version\";
+  }
+" 2>/dev/null)
+
+# --- Convert hex to binary ---
+echo -n "$hex" | xxd -r -p > "$output"
+
+# --- Emit progress events ---
+for f in "${files[@]}"; do
+  echo "{\"type\":\"progress\",\"event\":\"file_done\",\"path\":\"$f\"}" >&2
+done

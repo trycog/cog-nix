@@ -1,0 +1,8 @@
+{
+  "name": "cog-nix",
+  "version": "0.1.0",
+  "extensions": [".nix"],
+  "language_names": ["nix"],
+  "args": ["--output", "{output}", "{files}"],
+  "build": "chmod +x bin/cog-nix"
+}
