@@ -42,15 +42,15 @@ let
   # result list tracking line/col positions.
 
   tokenPattern = builtins.concatStringsSep "|" [
-    "([a-zA-Z_][a-zA-Z0-9_-]*)"         # 1: identifier/keyword
-    "([0-9]+)"                            # 2: integer
-    "(\")"                                # 3: double quote
-    "('')"                                # 4: multiline string delim
-    "(#.*)"                               # 5: line comment (rest of line)
-    "([.][.][.])"                         # 6: ellipsis
-    "(\\$\\{)"                            # 7: interpolation start ${
-    "(==|!=|<=|>=|->|[+][+]|//)"         # 8: two-char operators
-    "([=:;.,@?{}()+*/<>!-]|\\[|\\])"    # 9: single-char tokens
+    "([a-zA-Z_][a-zA-Z0-9_-]*)"              # 1: identifier/keyword
+    "([0-9]+)"                                 # 2: integer
+    "(\")"                                     # 3: double quote
+    "([']['])"                                 # 4: multiline string delim ''
+    "(#.*)"                                    # 5: line comment (rest of line)
+    "([.][.][.])"                              # 6: ellipsis
+    "(\\$[{])"                                 # 7: interpolation start ${
+    "(==|!=|<=|>=|->|[+][+]|//)"              # 8: two-char operators
+    "([=:;.,@?{}()+*/<>!-]|[[]|[]])"         # 9: single-char tokens
   ];
 
   # Find which group in a match list is non-null, return { group, value }
