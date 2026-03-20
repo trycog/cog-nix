@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="$SCRIPT_DIR/../lib"
+LIB_DIR="$(cd "$SCRIPT_DIR/../lib" && pwd)"
 
 # --- Parse CLI args ---
 output=""
@@ -50,7 +50,6 @@ fi
 # --- Build Nix file list expression ---
 nix_files="["
 for f in "${files[@]}"; do
-  # Escape path for Nix string
   escaped="${f//\\/\\\\}"
   escaped="${escaped//\"/\\\"}"
   nix_files="$nix_files \"$escaped\""
@@ -58,17 +57,24 @@ done
 nix_files="$nix_files ]"
 
 # --- Run Nix evaluation ---
-hex=$(nix eval --impure --raw --expr "
+hex=$(nix eval --extra-experimental-features "nix-command flakes" --impure --raw --expr "
   import $LIB_DIR {
     files = $nix_files;
     projectRoot = \"$project_root\";
     packageName = \"$package_name\";
     toolVersion = \"$version\";
   }
-" 2>/dev/null)
+")
 
 # --- Convert hex to binary ---
-echo -n "$hex" | xxd -r -p > "$output"
+if command -v xxd &>/dev/null; then
+  echo -n "$hex" | xxd -r -p > "$output"
+elif command -v python3 &>/dev/null; then
+  python3 -c "import sys; sys.stdout.buffer.write(bytes.fromhex(sys.stdin.read()))" <<< "$hex" > "$output"
+else
+  echo "Error: xxd or python3 required for hex-to-binary conversion" >&2
+  exit 1
+fi
 
 # --- Emit progress events ---
 for f in "${files[@]}"; do

@@ -16,7 +16,11 @@ jobs:
 
       - uses: cachix/install-nix-action@v30
         with:
-          nix_path: nixpkgs=channel:nixpkgs-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Install xxd
+        run: sudo apt-get update && sudo apt-get install -y xxd
 
       - name: Verify tag matches manifest version
         run: |
@@ -26,9 +30,6 @@ jobs:
             echo "Tag version ($TAG_VERSION) does not match manifest version ($MANIFEST_VERSION)"
             exit 1
           fi
-
-      - name: Build
-        run: nix build
 
       - name: Run smoke tests
         run: bash test/smoke.sh

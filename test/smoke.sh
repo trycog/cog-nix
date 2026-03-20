@@ -13,12 +13,11 @@ run_test() {
   local name="$1"
   local file="$2"
   local output="/tmp/cog-nix-test-${name}.scip"
+  local errfile="/tmp/cog-nix-test-${name}.err"
 
   echo -n "Test: $name ... "
-  if "$BIN" --output "$output" "$file" 2>/dev/null; then
-    # Verify output is non-empty
+  if "$BIN" --output "$output" "$file" 2>"$errfile"; then
     if [[ -s "$output" ]]; then
-      # If protoc is available, verify it's valid protobuf
       if command -v protoc &>/dev/null; then
         if protoc --decode_raw < "$output" >/dev/null 2>&1; then
           echo "PASS (valid protobuf)"
@@ -33,17 +32,27 @@ run_test() {
       fi
     else
       echo "FAIL (empty output)"
+      echo "  stderr: $(cat "$errfile")"
       fail=$((fail + 1))
     fi
-    rm -f "$output"
   else
     echo "FAIL (non-zero exit)"
+    echo "  stderr: $(cat "$errfile")"
     fail=$((fail + 1))
-    rm -f "$output"
   fi
+  rm -f "$output" "$errfile"
 }
 
 echo "=== cog-nix smoke tests ==="
+echo ""
+
+# Verify nix is available
+if ! command -v nix &>/dev/null; then
+  echo "SKIP: nix not found in PATH"
+  exit 0
+fi
+
+echo "nix version: $(nix --version)"
 echo ""
 
 run_test "simple_project" "$FIXTURES/simple_project/default.nix"
